@@ -1,0 +1,7 @@
+# Windows line endings for the files people run or open on Windows
+# (applies on checkout and in GitHub's "Download ZIP")
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.txt text eol=crlf
+*.md  text
+*.ico binary
