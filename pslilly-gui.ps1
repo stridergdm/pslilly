@@ -66,16 +66,17 @@ if ([Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') {
 }
 
 if ($CreateShortcut) {
-    # conhost + -WindowStyle Hidden: no console window, even where Windows
-    # Terminal is the default. -ExecutionPolicy Bypass is for this run only,
-    # so the shortcut also works on a PC where scripts are blocked.
+    # conhost --headless: no console window at all, so Windows Terminal can't
+    # open a tab for it (-WindowStyle Hidden is the fallback for older Windows).
+    # -ExecutionPolicy Bypass is for this run only, so the shortcut also works
+    # on a PC where scripts are blocked.
     $exe  = (Get-Process -Id $PID).Path
     $con  = Join-Path $env:SystemRoot 'System32\conhost.exe'
     $runArgs = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`""
     $lnk  = Join-Path ([Environment]::GetFolderPath('Desktop')) 'PSLilly.lnk'
     $sh   = New-Object -ComObject WScript.Shell
     $sc   = $sh.CreateShortcut($lnk)
-    if (Test-Path -LiteralPath $con) { $sc.TargetPath = $con; $sc.Arguments = "`"$exe`" $runArgs" }
+    if (Test-Path -LiteralPath $con) { $sc.TargetPath = $con; $sc.Arguments = "--headless `"$exe`" $runArgs" }
     else { $sc.TargetPath = $exe; $sc.Arguments = $runArgs }
     $sc.WorkingDirectory = $PSScriptRoot
     $sc.Description      = 'PSLilly - Lily chat'

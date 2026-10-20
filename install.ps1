@@ -73,16 +73,18 @@ try {
 
     if (-not $NoShortcuts) {
         # --- shortcuts ---------------------------------------------------------
-        # conhost + -WindowStyle Hidden: no console window, even where Windows
-        # Terminal is the default terminal. -ExecutionPolicy Bypass applies to
-        # this one run only; it doesn't change any Windows setting.
+        # conhost --headless: PowerShell runs with no console window at all, so
+        # Windows Terminal (the default terminal on Windows 11) can't open a tab
+        # for it. -WindowStyle Hidden is a fallback for Windows versions without
+        # --headless. -ExecutionPolicy Bypass applies to this one run only; it
+        # doesn't change any Windows setting.
         $ps   = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
         $host_ = Join-Path $env:SystemRoot 'System32\conhost.exe'
         $gui  = Join-Path $Destination 'pslilly-gui.ps1'
         $icon = Join-Path $Destination 'pslilly.ico'
         $runArgs = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$gui`""
         $target = $ps; $arguments = $runArgs
-        if (Test-Path -LiteralPath $host_) { $target = $host_; $arguments = "`"$ps`" $runArgs" }
+        if (Test-Path -LiteralPath $host_) { $target = $host_; $arguments = "--headless `"$ps`" $runArgs" }
 
         $shell = New-Object -ComObject WScript.Shell
         $places = @(
@@ -104,7 +106,9 @@ try {
         # --- Settings > Apps entry (per user, no admin) -------------------------
         $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\PSLilly'
         New-Item -Path $key -Force | Out-Null
-        $uninstall = "`"$ps`" -NoProfile -ExecutionPolicy Bypass -File `"$(Join-Path $Destination 'uninstall.ps1')`""
+        # (headless too: the uninstaller only shows message boxes)
+        $unArgs = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$(Join-Path $Destination 'uninstall.ps1')`""
+        $uninstall = if (Test-Path -LiteralPath $host_) { "`"$host_`" --headless `"$ps`" $unArgs" } else { "`"$ps`" $unArgs" }
         $values = @{
             DisplayName     = 'PSLilly'
             DisplayVersion  = $Version
