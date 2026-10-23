@@ -17,7 +17,7 @@
     file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #>
 
-$script:LillyVersion = '0.7'
+$script:LillyVersion = '0.8'
 
 # ---------------------------------------------------------------------------
 # Settings. Shared with the console client (pslilly.ps1) through lily.conf;

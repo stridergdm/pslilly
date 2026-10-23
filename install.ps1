@@ -36,7 +36,7 @@ $Starter = [ordered]@{
 # ===========================================================================
 
 $ErrorActionPreference = 'Stop'
-$Version = '0.7'
+$Version = '0.8'
 $src = $PSScriptRoot
 $files = @('pslilly-gui.ps1', 'pslilly-core.ps1', 'pslilly.ps1', 'pslilly.ico', 'uninstall.ps1', 'README.txt')
 $onWindows = [Environment]::OSVersion.Platform -eq 'Win32NT'
