@@ -27,7 +27,8 @@
         Ctrl+Z / Ctrl+Y    undo / redo     Esc              clear the line
         Ctrl+mouse wheel   zoom
 
-    $$ lists settings and commands. $$! <command> runs PowerShell.
+    $$ lists settings and commands. $$! <command> runs PowerShell;
+    $$!> <command> runs it and sends the output lines to Lily.
 
 .NOTES
     This Source Code Form is subject to the terms of the Mozilla Public

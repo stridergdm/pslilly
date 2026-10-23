@@ -1754,16 +1754,57 @@ function Set-LillyAutoHere($s) {
 # ---------------------------------------------------------------------------
 # $$! commands: run PowerShell in the background, show the output when done
 # ---------------------------------------------------------------------------
-function Start-LillyCommand($s, [string]$cmd) {
+# -Send ($$!>): the output lines are sent to Lily as if typed, within these limits
+$script:LillySendMaxLines = 10
+$script:LillySendMaxChars = 1024
+
+function Start-LillyCommand($s, [string]$cmd, [switch]$Send) {
     $rs = [runspacefactory]::CreateRunspace()
     $rs.Open()
     try { $null = $rs.SessionStateProxy.Path.SetLocation((Get-Location).ProviderPath) } catch {}
     $ps = [powershell]::Create()
     $ps.Runspace = $rs
-    $null = $ps.AddScript($cmd).AddCommand('Out-String').AddParameter('Width', 160)
+    if ($Send) {
+        # one output line per line, no wrapping (each becomes a message)
+        $null = $ps.AddScript($cmd).AddCommand('Out-String').AddParameter('Stream').AddParameter('Width', 4096)
+    } else {
+        $null = $ps.AddScript($cmd).AddCommand('Out-String').AddParameter('Width', 160)
+    }
     $async = $ps.BeginInvoke()
-    $s.Commands.Add(@{ PS = $ps; RS = $rs; Async = $async; Cmd = $cmd; Started = [DateTime]::UtcNow })
-    Write-LillyNote $s "[running: $cmd]" 'command'
+    $s.Commands.Add(@{ PS = $ps; RS = $rs; Async = $async; Cmd = $cmd; Send = [bool]$Send; Started = [DateTime]::UtcNow })
+    $what = if ($Send) { 'running, will send the output' } else { 'running' }
+    Write-LillyNote $s "[${what}: $cmd]" 'command'
+}
+
+# $$!> finished: send its output lines (at most 10 lines / 1024 characters)
+function Send-LillyCommandOutput($s, $c, $res) {
+    $lines = @($res | ForEach-Object { "$_" } | ForEach-Object { $_ -split "\r?\n" } | ForEach-Object { $_.TrimEnd() } | Where-Object { $_ -ne '' })
+    $errors = @($c.PS.Streams.Error)
+    if ($errors.Count) {
+        Write-LillyNote $s "[$($c.Cmd)] nothing sent - the command reported an error:" 'error'
+        foreach ($e in $errors) { Write-LillyNote $s "  $e" 'error' }
+        return
+    }
+    if ($lines.Count -eq 0) { Write-LillyNote $s "[$($c.Cmd)] no output, nothing sent." 'command'; return }
+    if ($s.State -ne 'connected') { Write-LillyNote $s "[$($c.Cmd)] not sent - not connected." 'error'; return }
+    $sent = 0; $chars = 0; $cut = $false
+    foreach ($l in $lines) {
+        if ($sent -ge $LillySendMaxLines) { $cut = $true; break }
+        $room = $LillySendMaxChars - $chars
+        if ($room -le 0) { $cut = $true; break }
+        if ($l.Length -gt $room) {
+            if ($sent -gt 0) { $cut = $true; break }     # doesn't fit: stop here
+            $l = $l.Substring(0, $room); $cut = $true    # a single over-long line: send the first part
+        }
+        Send-LillyUserLine $s $l
+        $sent++; $chars += $l.Length
+        if ($cut) { break }
+    }
+    if ($cut) {
+        $left = $lines.Count - $sent
+        $more = if ($left -gt 0) { "$left more line(s) not sent" } else { 'the rest of that line was not sent' }
+        Write-LillyNote $s "[$($c.Cmd)] sent $sent line(s); $more (limit: $LillySendMaxLines lines or $LillySendMaxChars characters)." 'error'
+    }
 }
 
 function Update-LillyCommands($s) {
@@ -1771,6 +1812,17 @@ function Update-LillyCommands($s) {
     foreach ($c in @($s.Commands)) {
         if (-not $c.Async.IsCompleted) { continue }
         $s.Commands.Remove($c) | Out-Null
+        if ($c.Send) {
+            try {
+                $res = $c.PS.EndInvoke($c.Async)
+                Send-LillyCommandOutput $s $c $res
+            } catch {
+                Write-LillyNote $s "[$($c.Cmd)] nothing sent: $($_.Exception.GetBaseException().Message)" 'error'
+            }
+            $c.PS.Dispose()
+            try { $c.RS.Dispose() } catch {}
+            continue
+        }
         $text = ''
         try {
             $res = $c.PS.EndInvoke($c.Async)
@@ -1886,6 +1938,7 @@ function Show-LillyHelp($s) {
         '  $$user <name> <style>     style private messages from someone, e.g. yellow on dark_red bold (off = remove)',
         '  $$map <char> <text>       send a character as <text> (off = built in; $$map lists yours)',
         '  $$! <command>             run a PowerShell command; output shows here when it finishes',
+        '  $$!> <command>            run it and SEND the output lines to Lily (max 10 lines / 1024 characters)',
         '  $$stop                    stop running $$! commands',
         '  $$reconnect               reconnect now',
         '  $$disconnect              disconnect (no automatic reconnecting)',
@@ -1985,6 +2038,12 @@ function Invoke-LillyMapCommand($s, [string]$arg) {
 # A line that started with $$. Returns 'quit' to close pslilly.
 function Invoke-LillyLocalCommand($s, [string]$cmd) {
     $cmd = $cmd.Trim()
+    if ($cmd.StartsWith('!>')) {
+        $c = $cmd.Substring(2).Trim()
+        if (-not $c) { Write-LillyNote $s 'Usage: $$!> <PowerShell command>, e.g. $$!> "/blurb $env:COMPUTERNAME"' 'error'; return }
+        Start-LillyCommand $s $c -Send
+        return
+    }
     if ($cmd.StartsWith('!')) {
         $c = $cmd.Substring(1).Trim()
         if (-not $c) { Write-LillyNote $s 'Usage: $$! <PowerShell command>, e.g. $$! Get-Date' 'error'; return }

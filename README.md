@@ -27,7 +27,8 @@ messages are public, private or emotes and who sent them.
   and when the network comes back; keepalive pings catch dead connections
 - Taskbar button flashes (and optionally a sound plays) when someone messages you privately
 - Scroll back with PgUp / PgDn without leaving the typing box
-- `$$! <command>` runs a PowerShell command and shows the output in the chat window
+- `$$! <command>` runs a PowerShell command and shows the output in the chat window;
+  `$$!> <command>` sends the output to Lily instead (e.g. `$$!> "/blurb $env:COMPUTERNAME"`)
 - Window size, position and all settings are remembered
 
 ## Install (the easy way)
@@ -153,6 +154,7 @@ character is sent as; `$$map` lists yours, `$$map ’ off` goes back to the buil
 | `$$<setting> [value]` | Show or change a setting |
 | `$$user`, `$$map` | Per-person styles, character replacements (see above) |
 | `$$! <command>` | Run PowerShell in the background; output appears when it finishes |
+| `$$!> <command>` | Run PowerShell and send each output line to Lily as if you typed it (at most 10 lines / 1024 characters), e.g. `$$!> "/blurb $env:COMPUTERNAME"` or `$$!> "bob: it's $(Get-Date -Format t) here"` |
 | `$$stop` | Stop running `$$!` commands |
 | `$$connect` | Log in (shows the login box) - window |
 | `$$reconnect` / `$$disconnect` | Reconnect now / disconnect and stay disconnected |
